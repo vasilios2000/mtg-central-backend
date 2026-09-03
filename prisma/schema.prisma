@@ -10,3 +10,73 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model Card {
+  id            Int     @id @default(autoincrement())
+  scryfallId    String  @unique
+  name          String
+  manaCost      String?
+  typeLine      String
+  oracleText    String?
+  colors        Json?
+  colorIdentity Json?
+  power         String?
+  toughness     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  printings Printing[]
+}
+
+model Set {
+  id          Int       @id @default(autoincrement())
+  scryfallId  String    @unique
+  code        String    @unique
+  name        String
+  setType     String
+  releaseDate DateTime?
+  iconSvgUri  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  printings Printing[]
+}
+
+model Printing {
+  id         Int    @id @default(autoincrement())
+  scryfallId String @unique
+
+  cardId Int
+  setId  Int
+
+  collectorNumber String
+  rarity          String
+  artist          String?
+  flavorText      String?
+  imageUris       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  card Card @relation(fields: [cardId], references: [id])
+  set  Set  @relation(fields: [setId], references: [id])
+
+  collectionEntries CollectionEntry[]
+}
+
+model CollectionEntry {
+  id         Int @id @default(autoincrement())
+  printingId Int
+
+  quantity  Int     @default(1)
+  foil      Boolean @default(false)
+  condition String?
+  language  String? @default("English")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  printing Printing @relation(fields: [printingId], references: [id])
+}
