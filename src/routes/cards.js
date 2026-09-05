@@ -30,6 +30,8 @@ router.post("/import", async (req, res) => {
 
         const scryfallCard = await getCardByName(name);
 
+
+        //create or update the card in the database
         const card = await prisma.card.upsert({
             where: { scryfallId: scryfallCard.id },
             update: {
@@ -55,7 +57,54 @@ router.post("/import", async (req, res) => {
             }
         });
 
-        res.status(201).json(card);
+        //create or update the set in the database
+        const set = await prisma.set.upsert({
+            where: { scryfallId: scryfallCard.set_id 
+
+            },
+            update: {
+                code: scryfallCard.set,
+                name: scryfallCard.set_name,
+            },
+            create: {
+                scryfallId: scryfallCard.set_id,
+                code: scryfallCard.set,
+                name: scryfallCard.set_name,
+                setType: "unknown"
+            }
+        });
+
+        //create or update the printing in the database
+        const printing = await prisma.printing.upsert({
+            where: {
+                scryfallId: scryfallCard.id
+            },
+            update: {
+                cardId: card.id,
+                setId: set.id,
+                collectorNumber: scryfallCard.collector_number,
+                rarity: scryfallCard.rarity,
+                artist: scryfallCard.artist || null,
+                flavorText: scryfallCard.flavor_text || null,
+                imageUris: scryfallCard.image_uris?.normal || null
+            },
+            create: {
+                scryfallId: scryfallCard.id,
+                cardId: card.id,
+                setId: set.id,
+                collectorNumber: scryfallCard.collector_number,
+                rarity: scryfallCard.rarity,
+                artist: scryfallCard.artist || null,
+                flavorText: scryfallCard.flavor_text || null,
+                imageUris: scryfallCard.image_uris?.normal || null
+            }
+        });
+
+        res.status(201).json({
+            card,
+            set,
+            printing
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to import card' });

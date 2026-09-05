@@ -55,7 +55,7 @@ model Printing {
   rarity          String
   artist          String?
   flavorText      String?
-  imageUris       String?
+  imageUris       Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

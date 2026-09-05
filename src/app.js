@@ -1,13 +1,16 @@
 const express = require('express');
 const prisma = require('./lib/prisma');
+
 const cardsRouter = require('./routes/cards');
 const testRouter = require('./routes/test');
+const collectionRouter = require('./routes/collection');
 
 const app = express();
 
 app.use(express.json());
 
 app.use("/api/cards", cardsRouter);
+app.use("/api/collection", collectionRouter);
 
 app.use("/api/test", testRouter);
 
