@@ -63,20 +63,31 @@ model Printing {
   card Card @relation(fields: [cardId], references: [id])
   set  Set  @relation(fields: [setId], references: [id])
 
-  collectionEntries CollectionEntry[]
+  collectionItems CollectionItem[]
 }
 
-model CollectionEntry {
-  id         Int @id @default(autoincrement())
-  printingId Int
+model Collection {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items CollectionItem[]
+}
+
+model CollectionItem {
+  id           Int @id @default(autoincrement())
+  collectionId Int
+  printingId   Int
 
   quantity  Int     @default(1)
   foil      Boolean @default(false)
   condition String?
-  language  String? @default("English")
+  language  String  @default("English")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  printing Printing @relation(fields: [printingId], references: [id])
+  collection Collection @relation(fields: [collectionId], references: [id])
+  printing   Printing   @relation(fields: [printingId], references: [id])
 }

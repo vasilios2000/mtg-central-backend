@@ -1,33 +1,62 @@
-const express = require('express');
-const prisma = require('../lib/prisma');
+const express = require("express");
+const prisma = require("../lib/prisma");
 
 const router = express.Router();
 
-router.get('/', async (req, res) => {
-    try {
-        const collection = await prisma.collectionEntry.findMany({
-            include: {
-                printing: {
-                    include: {
-                        card: true,
-                        set: true
+//gets all collections
+router.get("/", async (req, res) => {
+  try {
+    const collections = await prisma.collection.findMany({
+        include: {
+            items: {
+                include: {
+                    printing: {
+                        include: {
+                            card: true,
+                            set: true,
                     }
                 }
-            },
-            orderBy: {
-                id: "asc"
             }
-        });
-        res.json(collection);
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: 'Failed to fetch collection'        
-        });
-    }  
+        }
+    }, 
+    orderBy: {
+        name: "asc"
+    }
+    });
+    res.json(collections);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch collection" });
+  }
 });
 
-router.post('/', async (req, res) => {
+//makes a new collection with the given name
+router.post("/", async (req, res) => {
     try {
+        const {name } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ error: "Name is required" });
+        }
+
+        const collection = await prisma.collection.create({
+            data: {
+                name,
+            },
+        });
+
+        res.status(201).json(collection);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to create collection" });
+    }
+});
+
+//adds an item to a collection
+router.post("/:collectionId/items", async (req, res) => {
+    try {
+        const collectionId = Number(req.params.collectionId);
+
         const {
             printingId,
             quantity,
@@ -36,19 +65,50 @@ router.post('/', async (req, res) => {
             language
         } = req.body;
 
-        if (!printingId) {
-            return res.status(400).json({ error: 'Printing ID is required' 
-
-            });  
+        if (!Number.isInteger(collectionId)) {
+            return res.status(400).json({
+                error: "Invalid collection ID"
+            });
         }
 
-        const collectionEntry = await prisma.collectionEntry.create({
+        if (!printingId) {
+            return res.status(400).json({
+                error: "Printing ID is required"
+            });
+        }
+
+        const collection = await prisma.collection.findUnique({
+            where: {
+                id: collectionId
+            }
+        });
+
+        if (!collection) {
+            return res.status(404).json({
+                error: "Collection not found"
+            });
+        }
+
+        const printing = await prisma.printing.findUnique({
+            where: {
+                id: Number(printingId)
+            }
+        });
+
+        if (!printing) {
+            return res.status(404).json({
+                error: "Printing not found"
+            });
+        }
+
+        const collectionItem = await prisma.collectionItem.create({
             data: {
-                printingId,
-                quantity: quantity || 1,
-                foil: foil || false,
-                condition: condition || null,
-                language: language || "English"
+                collectionId,
+                printingId: Number(printingId),
+                quantity: quantity ?? 1,
+                foil: foil ?? false,
+                condition: condition ?? null,
+                language: language ?? "English"
             },
             include: {
                 printing: {
@@ -60,32 +120,58 @@ router.post('/', async (req, res) => {
             }
         });
 
-        res.status(201).json(collectionEntry);
-                
+        res.status(201).json(collectionItem);
+
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: 'Failed to add card to collection' });
+        console.error(error);
+
+        res.status(500).json({
+            error: "Failed to add card to collection"
+        });
     }
 });
 
-router.put('/:id', async (req, res) => {
+//updates an item in a collection
+router.put("/:collectionId/items/:itemId", async (req, res) => {
     try {
-        const id = Number(req.params.id);
+        const collectionId = Number(req.params.collectionId);
+        const itemId = Number(req.params.itemId);
 
         const {
             quantity,
             foil,
             condition,
-            language  
+            language
         } = req.body;
 
-        const collectionEntry = await prisma.collectionEntry.update({
-            where: { id },
+        if (!Number.isInteger(collectionId) || !Number.isInteger(itemId)) {
+            return res.status(400).json({
+                error: "Invalid collection or item ID"
+            });
+        }
+
+        const collectionItem = await prisma.collectionItem.findFirst({
+            where: {
+                id: itemId,
+                collectionId
+            }
+        });
+
+        if (!collectionItem) {
+            return res.status(404).json({
+                error: "Collection item not found"
+            });
+        }
+
+        const updatedItem = await prisma.collectionItem.update({
+            where: {
+                id: itemId
+            },
             data: {
-                quantity,
-                foil,
-                condition,
-                language
+                quantity: quantity ?? collectionItem.quantity,
+                foil: foil ?? collectionItem.foil,
+                condition: condition ?? collectionItem.condition,
+                language: language ?? collectionItem.language
             },
             include: {
                 printing: {
@@ -96,27 +182,59 @@ router.put('/:id', async (req, res) => {
                 }
             }
         });
-        
-        res.json(collectionEntry);
-        
+
+        res.json(updatedItem);
+
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: 'Failed to update collection entry' });
+        console.error(error);
+
+        res.status(500).json({
+            error: "Failed to update collection item"
+        });
     }
 });
 
-router.delete('/:id', async (req, res) => {
+//deletes an item from a collection
+router.delete("/:collectionId/items/:itemId", async (req, res) => {
     try {
-        const id = Number(req.params.id);
+        const collectionId = Number(req.params.collectionId);
+        const itemId = Number(req.params.itemId);
 
-        await prisma.collectionEntry.delete({
-            where: { id }
+        if (!Number.isInteger(collectionId) || !Number.isInteger(itemId)) {
+            return res.status(400).json({
+                error: "Invalid collection or item ID"
+            });
+        }
+
+        const collectionItem = await prisma.collectionItem.findFirst({
+            where: {
+                id: itemId,
+                collectionId
+            }
         });
 
-        res.json({ message: 'Collection entry deleted successfully' });
+        if (!collectionItem) {
+            return res.status(404).json({
+                error: "Collection item not found"
+            });
+        }
+
+        await prisma.collectionItem.delete({
+            where: {
+                id: itemId
+            }
+        });
+
+        res.json({
+            message: "Card removed from collection"
+        });
+
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: 'Failed to delete collection entry' });
+        console.error(error);
+
+        res.status(500).json({
+            error: "Failed to remove card from collection"
+        });
     }
 });
 
